@@ -14,6 +14,9 @@ import sys
 from pathlib import Path
 
 REPORT_TITLE = "WORLD NEWS: Wednesday, November 11, 2026"
+REPORT_DATE = "2026-11-11"
+VERSION = "1.1.0"
+MAX_WORD_BUDGET = 1000
 
 SECTIONS: list[tuple[str, str]] = [
     (
@@ -65,7 +68,7 @@ SECTIONS: list[tuple[str, str]] = [
     ),
     (
         "HEALTH & HUMANITARIAN",
-        "The Democratic Republic of Congo's Ebola outbreak surpassed 11,000 cases with "
+        "The Democratic DRC Ebola outbreak surpassed 11,000 cases with "
         "5,387 deaths—the country's deadliest ever. The Bundibugyo virus strain has no "
         "known vaccine and has spread to Uganda, Kenya, and Nigeria. Kenya discharged its "
         "last Ebola patient from a separate outbreak. A migrant boat capsized off Senegal, "
@@ -103,6 +106,15 @@ def render_summary(
     for heading, body in sections:
         blocks.append(f"{heading}\n{body}")
     return "\n\n".join(blocks) + "\n"
+
+
+def compute_metrics(text: str) -> dict[str, int]:
+    """Calculate character, word, and line counts for the rendered summary."""
+    return {
+        "characters": len(text),
+        "words": len(text.split()),
+        "lines": len(text.splitlines()),
+    }
 
 
 def resolve_output_path(cli_output: str | None) -> Path:
@@ -150,6 +162,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Output metadata and sections as JSON to stdout.",
     )
+    parser.add_argument(
+        "--stats-only",
+        action="store_true",
+        help="Display summary metrics without printing full text.",
+    )
     return parser.parse_args(argv)
 
 
@@ -158,16 +175,27 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     validate_sections(SECTIONS)
     summary = render_summary()
+    metrics = compute_metrics(summary)
 
     if args.json:
         payload = {
             "title": REPORT_TITLE,
+            "report_date": REPORT_DATE,
+            "version": VERSION,
             "section_count": len(SECTIONS),
-            "char_count": len(summary),
-            "word_count": len(summary.split()),
+            "char_count": metrics["characters"],
+            "word_count": metrics["words"],
+            "line_count": metrics["lines"],
             "sections": [{"heading": h, "body": b} for h, b in SECTIONS],
         }
         print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0
+
+    if args.stats_only:
+        print(f"Report: {REPORT_TITLE} (v{VERSION})")
+        print(f"Sections: {len(SECTIONS)}")
+        print(f"Words: {metrics['words']}")
+        print(f"Characters: {metrics['characters']}")
         return 0
 
     if args.dry_run:
@@ -178,8 +206,8 @@ def main(argv: list[str] | None = None) -> int:
     write_summary(output_path, summary)
     print(f"Summary written to {output_path}")
     print(
-        f"Stats: {len(SECTIONS)} sections, {len(summary.split())} words, "
-        f"{len(summary)} characters"
+        f"Stats: {len(SECTIONS)} sections, {metrics['words']} words, "
+        f"{metrics['characters']} characters"
     )
     return 0
 
